@@ -9,10 +9,6 @@ import { SubscriptionController } from "./subscription.controller";
 
 const router = Router();
 
-/* -------------------------------------------------------------------------- */
-/*                          SUBSCRIPTION ROUTES                               */
-/* -------------------------------------------------------------------------- */
-
 router.post(
   "/",
   auth(),
@@ -36,13 +32,5 @@ router.post(
 );
 
 router.post("/:id/resume", auth(), SubscriptionController.resumeSubscription);
-
-/* -------------------------------------------------------------------------- */
-/*                            WEBHOOK ROUTE                                   */
-/* -------------------------------------------------------------------------- */
-
-// Note: This route should NOT use JSON parsing middleware
-// You need to configure express to use raw body for this route
-router.post("/webhook", SubscriptionController.handleWebhook);
 
 export const SubscriptionRoutes = router;

@@ -86,8 +86,15 @@ const resumeSubscription = catchAsync(async (req: Request, res: Response) => {
 
 const handleWebhook = catchAsync(async (req: Request, res: Response) => {
   const signature = req.headers["stripe-signature"] as string;
+  const rawBody = (req as any).rawBody as Buffer; // From app.ts
+
+  if (!rawBody || !signature) {
+    res.status(status.BAD_REQUEST).json({ error: "Missing body or signature" });
+    return;
+  }
+
   const result = await SubscriptionService.handleStripeWebhook(
-    req.body,
+    rawBody,
     signature
   );
 

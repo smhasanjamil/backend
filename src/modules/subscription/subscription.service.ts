@@ -7,6 +7,8 @@ import {
 } from "./subscription.interface";
 import { stripe } from "../../config/stripe";
 import config from "../../config";
+import Stripe from "stripe";
+import { SubscriptionStatus } from "@prisma/client";
 
 /* -------------------------------------------------------------------------- */
 /*                        SUBSCRIPTION OPERATIONS                             */
@@ -16,41 +18,25 @@ const createSubscription = async (
   userId: string,
   payload: ICreateSubscriptionRequest
 ) => {
-  // 1. Verify Plan
   const plan = await prisma.plan.findUnique({
     where: { id: payload.planId, isActive: true },
   });
+  if (!plan) throw new AppError(status.NOT_FOUND, "Plan not found or inactive");
 
-  if (!plan) {
-    throw new AppError(status.NOT_FOUND, "Plan not found or inactive");
-  }
-
-  // 2. Get User
   const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError(status.NOT_FOUND, "User not found");
 
-  if (!user) {
-    throw new AppError(status.NOT_FOUND, "User not found");
-  }
-
-  // 3. Check existing active subscription
-  const existingSubscription = await prisma.subscription.findFirst({
-    where: {
-      userId,
-      status: { in: ["ACTIVE", "TRIALING"] },
-    },
+  const activeSub = await prisma.subscription.findFirst({
+    where: { userId, status: { in: ["ACTIVE", "TRIALING"] } },
   });
-
-  if (existingSubscription) {
+  if (activeSub)
     throw new AppError(
       status.CONFLICT,
       "User already has an active subscription"
     );
-  }
 
   try {
     let stripeCustomerId = user.stripeCustomerId;
-
-    // 4. Create or Get Stripe Customer
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
         email: user.email,
@@ -58,31 +44,25 @@ const createSubscription = async (
         metadata: { userId: user.id },
       });
       stripeCustomerId = customer.id;
-
       await prisma.user.update({
         where: { id: userId },
         data: { stripeCustomerId },
       });
     }
 
-    // 5. Attach Payment Method to Customer
     await stripe.paymentMethods.attach(payload.paymentMethodId, {
       customer: stripeCustomerId,
     });
 
-    // 6. Set as default payment method
     await stripe.customers.update(stripeCustomerId, {
-      invoice_settings: {
-        default_payment_method: payload.paymentMethodId,
-      },
+      invoice_settings: { default_payment_method: payload.paymentMethodId },
     });
 
-    // 7. Create Stripe Subscription with trial and auto-payment
-    const stripeSubscription = await stripe.subscriptions.create({
+    const stripeSub = await stripe.subscriptions.create({
       customer: stripeCustomerId,
       items: [{ price: plan.stripePriceId }],
-      trial_period_days: plan.trialDays,
-      payment_behavior: "default_incomplete", // This ensures no immediate charge
+      trial_period_days: plan.trialDays > 0 ? plan.trialDays : undefined,
+      payment_behavior: "default_incomplete",
       payment_settings: {
         payment_method_types: ["card"],
         save_default_payment_method: "on_subscription",
@@ -90,51 +70,56 @@ const createSubscription = async (
       expand: ["latest_invoice.payment_intent"],
     });
 
-    // 8. Confirm the setup (no charge during trial)
-    const invoice = stripeSubscription.latest_invoice as any;
-
-    let clientSecret = null;
-    if (invoice?.payment_intent) {
-      const paymentIntent = invoice.payment_intent as any;
-      clientSecret = paymentIntent.client_secret;
+    let clientSecret: string | null = null;
+    const invoice = stripeSub.latest_invoice as Stripe.Invoice | null;
+    if (invoice?.payment_intent && typeof invoice.payment_intent === "object") {
+      clientSecret = invoice.payment_intent.client_secret;
     }
 
-    // 9. Save to Database
+    const statusMap: Record<string, SubscriptionStatus> = {
+      active: SubscriptionStatus.ACTIVE,
+      trialing: SubscriptionStatus.TRIALING,
+      past_due: SubscriptionStatus.PAST_DUE,
+      canceled: SubscriptionStatus.CANCELED,
+      unpaid: SubscriptionStatus.UNPAID,
+      incomplete: SubscriptionStatus.INCOMPLETE,
+      incomplete_expired: SubscriptionStatus.INCOMPLETE_EXPIRED,
+    };
+
+    const dbStatus =
+      statusMap[stripeSub.status] ?? SubscriptionStatus.INCOMPLETE;
+
     const subscription = await prisma.subscription.create({
       data: {
         userId,
         planId: plan.id,
-        stripeSubscriptionId: stripeSubscription.id,
+        stripeSubscriptionId: stripeSub.id,
         stripeCustomerId,
-        status: stripeSubscription.status.toUpperCase() as any,
-        currentPeriodStart: new Date(
-          stripeSubscription.current_period_start * 1000
-        ),
-        currentPeriodEnd: new Date(
-          stripeSubscription.current_period_end * 1000
-        ),
-        trialStart: stripeSubscription.trial_start
-          ? new Date(stripeSubscription.trial_start * 1000)
+        status: dbStatus,
+        currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
+        currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
+        trialStart: stripeSub.trial_start
+          ? new Date(stripeSub.trial_start * 1000)
           : null,
-        trialEnd: stripeSubscription.trial_end
-          ? new Date(stripeSubscription.trial_end * 1000)
+        trialEnd: stripeSub.trial_end
+          ? new Date(stripeSub.trial_end * 1000)
           : null,
       },
-      include: {
-        plan: true,
-      },
+      include: { plan: true },
     });
 
     return {
       subscription,
-      clientSecret, // Return this for frontend confirmation if needed
-      message: `Subscription created successfully. ${plan.trialDays}-day trial started. Auto-payment will begin after trial.`,
+      clientSecret,
+      message: `Subscription created. ${
+        plan.trialDays > 0 ? `${plan.trialDays}-day trial started.` : ""
+      } First payment due on ${new Date(
+        stripeSub.current_period_end * 1000
+      ).toLocaleDateString()}.`,
     };
-  } catch (error: any) {
-    throw new AppError(
-      status.INTERNAL_SERVER_ERROR,
-      `Failed to create subscription: ${error.message}`
-    );
+  } catch (err: any) {
+    console.error("Subscription error:", err);
+    throw new AppError(status.INTERNAL_SERVER_ERROR, `Failed: ${err.message}`);
   }
 };
 
@@ -270,7 +255,7 @@ const resumeSubscription = async (userId: string, subscriptionId: string) => {
 /* -------------------------------------------------------------------------- */
 
 const handleStripeWebhook = async (rawBody: Buffer, signature: string) => {
-  let event;
+  let event: Stripe.Event;
 
   try {
     event = stripe.webhooks.constructEvent(
@@ -278,20 +263,23 @@ const handleStripeWebhook = async (rawBody: Buffer, signature: string) => {
       signature,
       config.stripe.stripe_webhook_secret!
     );
-  } catch (error: any) {
-    throw new AppError(status.BAD_REQUEST, `Webhook Error: ${error.message}`);
+  } catch (err: any) {
+    console.error(`Webhook signature verification failed:`, err.message);
+    throw new AppError(status.BAD_REQUEST, `Webhook Error: ${err.message}`);
   }
 
   console.log(`Received event: ${event.type}`);
 
   switch (event.type) {
-    // Subscription created (trial starts)
-    case "customer.subscription.created": {
-      const subscription = event.data.object as any;
+    case "customer.subscription.created":
+    case "customer.subscription.updated":
+    case "customer.subscription.deleted": {
+      const subscription = event.data.object as Stripe.Subscription;
+
       await prisma.subscription.updateMany({
         where: { stripeSubscriptionId: subscription.id },
         data: {
-          status: subscription.status.toUpperCase(),
+          status: subscription.status.toUpperCase() as any,
           currentPeriodStart: new Date(
             subscription.current_period_start * 1000
           ),
@@ -302,121 +290,34 @@ const handleStripeWebhook = async (rawBody: Buffer, signature: string) => {
           trialEnd: subscription.trial_end
             ? new Date(subscription.trial_end * 1000)
             : null,
-        },
-      });
-      console.log(`✅ Subscription created with trial: ${subscription.id}`);
-      break;
-    }
-
-    // Subscription updated (trial ending, status changes)
-    case "customer.subscription.updated": {
-      const subscription = event.data.object as any;
-      await prisma.subscription.updateMany({
-        where: { stripeSubscriptionId: subscription.id },
-        data: {
-          status: subscription.status.toUpperCase(),
-          currentPeriodStart: new Date(
-            subscription.current_period_start * 1000
-          ),
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
           cancelAtPeriodEnd: subscription.cancel_at_period_end,
           canceledAt: subscription.canceled_at
             ? new Date(subscription.canceled_at * 1000)
             : null,
         },
       });
-      console.log(`✅ Subscription updated: ${subscription.id}`);
       break;
     }
 
-    // Trial will end soon (3 days before)
-    case "customer.subscription.trial_will_end": {
-      const subscription = event.data.object as any;
-
-      // Get user info for notification
-      const dbSubscription = await prisma.subscription.findFirst({
-        where: { stripeSubscriptionId: subscription.id },
-        include: { user: true, plan: true },
-      });
-
-      if (dbSubscription) {
-        // TODO: Send email notification to user
-        console.log(
-          `⚠️ Trial ending soon for user: ${dbSubscription.user.email}`
-        );
-        // You can implement email notification here:
-        // await sendTrialEndingEmail(dbSubscription.user.email, dbSubscription);
-      }
-      break;
-    }
-
-    // First payment after trial (auto-charge)
-    case "invoice.payment_succeeded": {
-      const invoice = event.data.object as any;
-
-      if (invoice.billing_reason === "subscription_cycle") {
-        console.log(
-          `✅ Auto-payment successful for subscription: ${invoice.subscription}`
-        );
-
-        // Update subscription status to ACTIVE after first payment
-        await prisma.subscription.updateMany({
-          where: { stripeSubscriptionId: invoice.subscription },
-          data: { status: "ACTIVE" },
-        });
-
-        // TODO: Send payment success email
-        // const subscription = await prisma.subscription.findFirst({...});
-        // await sendPaymentSuccessEmail(subscription.user.email, invoice.amount_paid);
-      }
-      break;
-    }
-
-    // Payment failed after trial
+    case "invoice.payment_succeeded":
     case "invoice.payment_failed": {
-      const invoice = event.data.object as any;
-
-      console.log(
-        `❌ Payment failed for subscription: ${invoice.subscription}`
-      );
-
-      // Update subscription status to PAST_DUE
-      await prisma.subscription.updateMany({
-        where: { stripeSubscriptionId: invoice.subscription },
-        data: { status: "PAST_DUE" },
-      });
-
-      // TODO: Send payment failed email
-      // const subscription = await prisma.subscription.findFirst({...});
-      // await sendPaymentFailedEmail(subscription.user.email, invoice.amount_due);
-      break;
-    }
-
-    // Subscription deleted/canceled
-    case "customer.subscription.deleted": {
-      const subscription = event.data.object as any;
-      await prisma.subscription.updateMany({
-        where: { stripeSubscriptionId: subscription.id },
-        data: {
-          status: "CANCELED",
-          canceledAt: new Date(),
-        },
-      });
-      console.log(`✅ Subscription canceled: ${subscription.id}`);
-      break;
-    }
-
-    // Payment method attached
-    case "payment_method.attached": {
-      const paymentMethod = event.data.object as any;
-      console.log(
-        `✅ Payment method attached: ${paymentMethod.id} to customer ${paymentMethod.customer}`
-      );
+      const invoice = event.data.object as Stripe.Invoice;
+      if (invoice.subscription) {
+        await prisma.subscription.updateMany({
+          where: { stripeSubscriptionId: invoice.subscription as string },
+          data: {
+            status:
+              event.type === "invoice.payment_succeeded"
+                ? "ACTIVE"
+                : "PAST_DUE",
+          },
+        });
+      }
       break;
     }
 
     default:
-      console.log(`Unhandled event type: ${event.type}`);
+      console.log(`Unhandled event: ${event.type}`);
   }
 
   return { received: true };
