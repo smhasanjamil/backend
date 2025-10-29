@@ -1,32 +1,42 @@
 import { PrismaClient, UserRole } from "@prisma/client";
-import bcrypt from "bcrypt";
+import hashPassword from "../src/utils/hashPassword";
 import config from "../src/config";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const hashedPassword = await bcrypt.hash(config.super_admin.password, 12);
+  const { email, password, name } = config.super_admin;
+
+  // Only hash if we're creating or resetting
+  const hashedPassword = await hashPassword(password);
+
+  // Allow password reset only in development AND if explicitly enabled
+  const isDev = config.env === "development";
+  const shouldResetPassword =
+    isDev && process.env.RESET_SUPER_ADMIN_PASSWORD === "true";
 
   const superAdmin = await prisma.user.upsert({
-    where: { email: config.super_admin.email },
+    where: { email },
     update: {
-      name: config.super_admin.name,
-      // Don't update password on upsert unless needed
+      name,
+      role: UserRole.SUPER_ADMIN,
+      isVerified: true,
+      // Only update password if explicitly allowed
+      ...(shouldResetPassword && { password: hashedPassword }),
     },
     create: {
-      email: config.super_admin.email,
+      email,
       password: hashedPassword,
-      name: config.super_admin.name,
+      name,
       role: UserRole.SUPER_ADMIN,
       isVerified: true,
     },
   });
 
-  console.log("Super Admin ensured:", {
-    email: superAdmin.email,
-    name: superAdmin.name,
-    role: superAdmin.role,
-  });
+  console.log(`Super Admin ${superAdmin.email} is ready.`);
+  if (shouldResetPassword) {
+    console.log("Password has been reset (dev only).");
+  }
 }
 
 main()

@@ -348,23 +348,25 @@ const resetPassword = async (payload: IResetPasswordRequest) => {
   return { message: "Password reset successful" };
 };
 
-const changePassword = async (payload: IChangePasswordRequest) => {
+// auth.service.ts
+const changePassword = async (payload: {
+  userId: string;
+  oldPassword: string;
+}) => {
   const user = await prisma.user.findUnique({
-    where: { email: payload.email },
+    where: { id: payload.userId },
   });
 
-  if (!user) {
-    throw new AppError(404, "User not found");
-  }
+  if (!user) throw new AppError(404, "User not found");
 
-  const isPasswordValid = await comparePassword(
-    payload.oldPassword,
-    user.password
-  );
+  const isValid = await comparePassword(payload.oldPassword, user.password);
+  if (!isValid) throw new AppError(401, "Invalid old password");
 
-  if (!isPasswordValid) {
-    throw new AppError(401, "Invalid old password");
-  }
+  // Invalidate old CHANGE_PASSWORD OTPs
+  await prisma.oTP.updateMany({
+    where: { userId: user.id, type: "CHANGE_PASSWORD", isUsed: false },
+    data: { isUsed: true },
+  });
 
   const otp = generateOTP();
   const expiresAt = new Date(
@@ -383,24 +385,18 @@ const changePassword = async (payload: IChangePasswordRequest) => {
   await sendOTPEmail(user.email, otp, "CHANGE_PASSWORD");
 
   return {
-    message:
-      "OTP sent to your email. Please verify to complete password change.",
-    email: user.email,
+    message: "OTP sent to your email. Verify to complete password change.",
   };
 };
 
-const verifyChangePassword = async (payload: IVerifyChangePasswordRequest) => {
-  const user = await prisma.user.findUnique({
-    where: { email: payload.email },
-  });
-
-  if (!user) {
-    throw new AppError(404, "User not found");
-  }
-
+const verifyChangePassword = async (payload: {
+  userId: string;
+  otp: string;
+  newPassword: string;
+}) => {
   const otpRecord = await prisma.oTP.findFirst({
     where: {
-      userId: user.id,
+      userId: payload.userId,
       otp: payload.otp,
       type: "CHANGE_PASSWORD",
       isUsed: false,
@@ -408,25 +404,21 @@ const verifyChangePassword = async (payload: IVerifyChangePasswordRequest) => {
     },
   });
 
-  if (!otpRecord) {
-    throw new AppError(400, "Invalid or expired OTP");
-  }
+  if (!otpRecord) throw new AppError(400, "Invalid or expired OTP");
 
   const hashedPass = await hashPassword(payload.newPassword);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { password: hashedPass },
-  });
-
-  await prisma.oTP.update({
-    where: { id: otpRecord.id },
-    data: { isUsed: true },
-  });
-
-  await prisma.refreshToken.deleteMany({
-    where: { userId: user.id },
-  });
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: payload.userId },
+      data: { password: hashedPass },
+    }),
+    prisma.oTP.update({
+      where: { id: otpRecord.id },
+      data: { isUsed: true },
+    }),
+    prisma.refreshToken.deleteMany({ where: { userId: payload.userId } }),
+  ]);
 
   return { message: "Password changed successfully" };
 };

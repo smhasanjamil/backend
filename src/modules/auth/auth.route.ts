@@ -2,7 +2,17 @@ import { Router } from "express";
 import { authLimiter } from "../../middlewares/rateLimiter";
 import { AuthController } from "./auth.controller";
 import validateRequest from "../../middlewares/validateRequest";
-import { changePasswordValidation, forgotPasswordValidation, loginValidation, refreshTokenValidation, resetPasswordValidation, signupValidation, verifyChangePasswordValidation, verifyOTPValidation } from "./auth.validation";
+import {
+  changePasswordValidation,
+  forgotPasswordValidation,
+  loginValidation,
+  refreshTokenValidation,
+  resetPasswordValidation,
+  signupValidation,
+  verifyChangePasswordValidation,
+  verifyOTPValidation,
+} from "./auth.validation";
+import auth from "../../middlewares/authMiddleware";
 
 const router = Router();
 
@@ -56,6 +66,7 @@ router.post(
 router.post(
   "/change-password",
   authLimiter,
+  auth(), // ← protects both
   validateRequest(changePasswordValidation),
   AuthController.changePassword
 );
@@ -63,6 +74,7 @@ router.post(
 router.post(
   "/verify-change-password",
   authLimiter,
+  auth(),
   validateRequest(verifyChangePasswordValidation),
   AuthController.verifyChangePassword
 );

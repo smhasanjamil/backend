@@ -79,17 +79,31 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 const changePassword = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthService.changePassword(req.body);
+  const { oldPassword } = req.body;
+  const user = req.user!; 
+
+  const result = await AuthService.changePassword({
+    userId: user.userId,
+    oldPassword,
+  });
+
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
     message: result.message,
-    data: { email: result.email },
   });
 });
 
 const verifyChangePassword = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthService.verifyChangePassword(req.body);
+  const { otp, newPassword } = req.body;
+  const user = req.user!;
+
+  const result = await AuthService.verifyChangePassword({
+    userId: user.userId,
+    otp,
+    newPassword,
+  });
+
   sendResponse(res, {
     statusCode: status.OK,
     success: true,

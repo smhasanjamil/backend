@@ -24,6 +24,7 @@
     "helmet": "^8.1.0",
     "http-status": "^2.1.0",
     "jsonwebtoken": "^9.0.2",
+    "stripe": "^19.1.0",
     "winston": "^3.18.3",
     "zod": "^4.1.12"
   },

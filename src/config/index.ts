@@ -16,6 +16,12 @@ export default {
     refresh_expires_in: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
   },
 
+  stripe: {
+    stripe_secret_key: process.env.STRIPE_SECRET_KEY,
+    stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
+    client_url: process.env.CLIENT_URL,
+  },
+
   brevo: {
     api_key: process.env.BREVO_API_KEY!,
     sender_email: process.env.BREVO_SENDER_EMAIL!,

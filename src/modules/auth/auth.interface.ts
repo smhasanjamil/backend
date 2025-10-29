@@ -30,13 +30,10 @@ export interface IResetPasswordRequest {
 }
 
 export interface IChangePasswordRequest {
-  email: string;
   oldPassword: string;
-  newPassword: string;
 }
 
 export interface IVerifyChangePasswordRequest {
-  email: string;
   otp: string;
   newPassword: string;
 }

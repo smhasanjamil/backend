@@ -13,18 +13,35 @@ enum UserRole {
   USER
 }
 
+enum PlanInterval {
+  MONTH
+  YEAR
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  UNPAID
+}
+
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  password      String
-  name          String
-  role          UserRole  @default(USER)
-  isVerified    Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  otps          OTP[]
-  refreshTokens RefreshToken[]
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String
+  name       String
+  role       UserRole @default(USER)
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  otps             OTP[]
+  refreshTokens    RefreshToken[]
+  stripeCustomerId String?        @unique
+  subscriptions    Subscription[]
 }
 
 model OTP {
@@ -32,7 +49,7 @@ model OTP {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   otp       String
-  type      String   // SIGNUP, LOGIN, FORGOT_PASSWORD, CHANGE_PASSWORD
+  type      String // SIGNUP, LOGIN, FORGOT_PASSWORD, CHANGE_PASSWORD
   expiresAt DateTime
   isUsed    Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -45,4 +62,43 @@ model RefreshToken {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model Plan {
+  id              String       @id @default(uuid())
+  name            String
+  description     String?
+  price           Float
+  interval        PlanInterval
+  trialDays       Int          @default(1)
+  stripePriceId   String       @unique
+  stripeProductId String       @unique
+  features        Json?
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  userId               String
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId               String
+  plan                 Plan               @relation(fields: [planId], references: [id])
+  stripeSubscriptionId String             @unique
+  stripeCustomerId     String
+  status               SubscriptionStatus
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  canceledAt           DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([stripeSubscriptionId])
 }
