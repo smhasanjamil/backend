@@ -254,9 +254,78 @@ const resumeSubscription = async (userId: string, subscriptionId: string) => {
 /*                           STRIPE WEBHOOK HANDLER                           */
 /* -------------------------------------------------------------------------- */
 
+// const handleStripeWebhook = async (rawBody: Buffer, signature: string) => {
+//   let event: Stripe.Event;
+
+//   try {
+//     event = stripe.webhooks.constructEvent(
+//       rawBody,
+//       signature,
+//       config.stripe.stripe_webhook_secret!
+//     );
+//   } catch (err: any) {
+//     console.error(`Webhook signature verification failed:`, err.message);
+//     throw new AppError(status.BAD_REQUEST, `Webhook Error: ${err.message}`);
+//   }
+
+//   console.log(`Received event: ${event.type}`);
+
+//   switch (event.type) {
+//     case "customer.subscription.created":
+//     case "customer.subscription.updated":
+//     case "customer.subscription.deleted": {
+//       const subscription = event.data.object as Stripe.Subscription;
+
+//       await prisma.subscription.updateMany({
+//         where: { stripeSubscriptionId: subscription.id },
+//         data: {
+//           status: subscription.status.toUpperCase() as any,
+//           currentPeriodStart: new Date(
+//             subscription.current_period_start * 1000
+//           ),
+//           currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+//           trialStart: subscription.trial_start
+//             ? new Date(subscription.trial_start * 1000)
+//             : null,
+//           trialEnd: subscription.trial_end
+//             ? new Date(subscription.trial_end * 1000)
+//             : null,
+//           cancelAtPeriodEnd: subscription.cancel_at_period_end,
+//           canceledAt: subscription.canceled_at
+//             ? new Date(subscription.canceled_at * 1000)
+//             : null,
+//         },
+//       });
+//       break;
+//     }
+
+//     case "invoice.payment_succeeded":
+//     case "invoice.payment_failed": {
+//       const invoice = event.data.object as Stripe.Invoice;
+//       if (invoice.subscription) {
+//         await prisma.subscription.updateMany({
+//           where: { stripeSubscriptionId: invoice.subscription as string },
+//           data: {
+//             status:
+//               event.type === "invoice.payment_succeeded"
+//                 ? "ACTIVE"
+//                 : "PAST_DUE",
+//           },
+//         });
+//       }
+//       break;
+//     }
+
+//     default:
+//       console.log(`Unhandled event: ${event.type}`);
+//   }
+
+//   return { received: true };
+// };
+
+
 const handleStripeWebhook = async (rawBody: Buffer, signature: string) => {
   let event: Stripe.Event;
-
   try {
     event = stripe.webhooks.constructEvent(
       rawBody,
@@ -264,38 +333,50 @@ const handleStripeWebhook = async (rawBody: Buffer, signature: string) => {
       config.stripe.stripe_webhook_secret!
     );
   } catch (err: any) {
-    console.error(`Webhook signature verification failed:`, err.message);
-    throw new AppError(status.BAD_REQUEST, `Webhook Error: ${err.message}`);
+    throw new AppError(400, `Webhook Error: ${err.message}`);
   }
 
-  console.log(`Received event: ${event.type}`);
+  // IDEMPOTENCY
+  const existing = await prisma.webhookEvent.findUnique({
+    where: { id: event.id },
+  });
+  if (existing) {
+    return { received: true, id: event.id };
+  }
+
+  const STATUS_MAP: Record<string, SubscriptionStatus> = {
+    active: SubscriptionStatus.ACTIVE,
+    trialing: SubscriptionStatus.TRIALING,
+    past_due: SubscriptionStatus.PAST_DUE,
+    canceled: SubscriptionStatus.CANCELED,
+    unpaid: SubscriptionStatus.UNPAID,
+    incomplete: SubscriptionStatus.INCOMPLETE,
+    incomplete_expired: SubscriptionStatus.INCOMPLETE_EXPIRED,
+  };
 
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
-      const subscription = event.data.object as Stripe.Subscription;
-
-      await prisma.subscription.updateMany({
-        where: { stripeSubscriptionId: subscription.id },
-        data: {
-          status: subscription.status.toUpperCase() as any,
-          currentPeriodStart: new Date(
-            subscription.current_period_start * 1000
-          ),
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-          trialStart: subscription.trial_start
-            ? new Date(subscription.trial_start * 1000)
-            : null,
-          trialEnd: subscription.trial_end
-            ? new Date(subscription.trial_end * 1000)
-            : null,
-          cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          canceledAt: subscription.canceled_at
-            ? new Date(subscription.canceled_at * 1000)
-            : null,
-        },
+      const sub = event.data.object as Stripe.Subscription;
+      const dbSub = await prisma.subscription.findUnique({
+        where: { stripeSubscriptionId: sub.id },
       });
+
+      if (dbSub) {
+        await prisma.subscription.update({
+          where: { id: dbSub.id },
+          data: {
+            status: STATUS_MAP[sub.status] ?? SubscriptionStatus.INCOMPLETE,
+            currentPeriodStart: new Date(sub.current_period_start * 1000),
+            currentPeriodEnd: new Date(sub.current_period_end * 1000),
+            trialStart: sub.trial_start ? new Date(sub.trial_start * 1000) : null,
+            trialEnd: sub.trial_end ? new Date(sub.trial_end * 1000) : null,
+            cancelAtPeriodEnd: sub.cancel_at_period_end,
+            canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
+          },
+        });
+      }
       break;
     }
 
@@ -306,19 +387,21 @@ const handleStripeWebhook = async (rawBody: Buffer, signature: string) => {
         await prisma.subscription.updateMany({
           where: { stripeSubscriptionId: invoice.subscription as string },
           data: {
-            status:
-              event.type === "invoice.payment_succeeded"
-                ? "ACTIVE"
-                : "PAST_DUE",
+            status: event.type === "invoice.payment_succeeded"
+              ? SubscriptionStatus.ACTIVE
+              : SubscriptionStatus.PAST_DUE,
           },
         });
       }
       break;
     }
-
-    default:
-      console.log(`Unhandled event: ${event.type}`);
   }
+
+  // Mark as processed
+  await prisma.webhookEvent.create({
+    data: { id: event.id, type: event.type },
+  });
+  
 
   return { received: true };
 };
