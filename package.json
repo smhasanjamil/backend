@@ -2,13 +2,14 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/server.js",
   "scripts": {
     "postinstall": "npx prisma generate",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "seed": "ts-node prisma/seedSuperAdmin.ts"
+    "seed": "ts-node prisma/seedSuperAdmin.ts",
+    "vercel-build": "npm run build"
   },
   "keywords": [],
   "author": "",
