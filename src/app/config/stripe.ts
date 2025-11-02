@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import config from "./index";
+import config from ".";
 
 if (!config.stripe.stripe_secret_key) {
   throw new Error("Stripe secret key is missing");

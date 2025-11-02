@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
+import status from "http-status";
 import catchAsync from "../../utils/catchAsync";
 import { AuthService } from "./auth.service";
 import sendResponse from "../../utils/sendResponse";
-import status from "http-status";
 
 const signup = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.signup(req.body);
@@ -80,7 +80,7 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 
 const changePassword = catchAsync(async (req: Request, res: Response) => {
   const { oldPassword } = req.body;
-  const user = req.user!; 
+  const user = req.user!;
 
   const result = await AuthService.changePassword({
     userId: user.userId,

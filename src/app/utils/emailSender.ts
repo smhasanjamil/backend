@@ -31,7 +31,9 @@ const sendEmail = async (options: IEmailOptions): Promise<void> => {
       }
     );
 
-    logger.info(`Email sent to ${options.to}`, { messageId: response.data.messageId });
+    logger.info(`Email sent to ${options.to}`, {
+      messageId: response.data.messageId,
+    });
   } catch (error: any) {
     const brevoError = error.response?.data || error.message;
     logger.error("Brevo API Error:", {

@@ -1,13 +1,13 @@
 import express, { Application } from "express";
-import corsHandler from "./middlewares/corsHandler";
-import securityHeaders from "./middlewares/securityHeaders";
-import { generalLimiter } from "./middlewares/rateLimiter";
-import requestLogger from "./middlewares/requestLogger";
-import notFoundHandler from "./middlewares/notFoundHandler";
-import router from "./routes";
-import globalErrorHandler from "./middlewares/globalErrorHandler";
-import config from "./config";
-import { SubscriptionController } from "./modules/subscription/subscription.controller";
+import { SubscriptionController } from "./app/modules/subscription/subscription.controller";
+import corsHandler from "./app/middlewares/corsHandler";
+import securityHeaders from "./app/middlewares/securityHeaders";
+import { generalLimiter } from "./app/middlewares/rateLimiter";
+import requestLogger from "./app/middlewares/requestLogger";
+import config from "./app/config";
+import router from "./app/routes";
+import notFoundHandler from "./app/middlewares/notFoundHandler";
+import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 
 const app: Application = express();
 

@@ -1,26 +1,24 @@
 import status from "http-status";
-import config from "../../config";
-import prisma from "../../config/prisma";
-import AppError from "../../errors/AppError";
-import comparePassword from "../../utils/comparePassword";
-import { sendOTPEmail } from "../../utils/emailSender";
 import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
-} from "../../utils/generateToken";
-import hashPassword from "../../utils/hashPassword";
-import generateOTP from "../../utils/otpGenerator";
-import {
-  IChangePasswordRequest,
   IForgotPasswordRequest,
   ILoginRequest,
   IRefreshTokenRequest,
   IResetPasswordRequest,
   ISignupRequest,
-  IVerifyChangePasswordRequest,
   IVerifyOTPRequest,
 } from "./auth.interface";
+import prisma from "../../config/prisma";
+import AppError from "../../errors/AppError";
+import generateOTP from "../../utils/otpGenerator";
+import config from "../../config";
+import { sendOTPEmail } from "../../utils/emailSender";
+import hashPassword from "../../utils/hashPassword";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from "../../utils/generateToken";
+import comparePassword from "../../utils/comparePassword";
 
 /* -------------------------------------------------------------------------- */
 /*                                 SIGNUP                                    */

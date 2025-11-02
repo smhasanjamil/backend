@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
 import status from "http-status";
 import catchAsync from "../../utils/catchAsync";
-import sendResponse from "../../utils/sendResponse";
 import { PlanService } from "./plan.service";
+import sendResponse from "../../utils/sendResponse";
+
 /* -------------------------------------------------------------------------- */
 /*                            PLAN CONTROLLERS                                */
 /* -------------------------------------------------------------------------- */

@@ -4,6 +4,7 @@ import { UserController } from "./user.controller";
 import validateRequest from "../../middlewares/validateRequest";
 import { getUsersValidation, updateUserValidation } from "./user.validation";
 
+
 const router = Router();
 
 // Public profile (logged-in user only)

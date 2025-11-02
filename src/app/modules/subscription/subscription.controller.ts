@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
+
+import status from "http-status";
 import catchAsync from "../../utils/catchAsync";
 import { SubscriptionService } from "./subscription.service";
 import sendResponse from "../../utils/sendResponse";
-import status from "http-status";
 
 /* -------------------------------------------------------------------------- */
 /*                        SUBSCRIPTION CONTROLLERS                            */

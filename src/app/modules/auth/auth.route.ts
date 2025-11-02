@@ -1,7 +1,5 @@
 import { Router } from "express";
-import { authLimiter } from "../../middlewares/rateLimiter";
-import { AuthController } from "./auth.controller";
-import validateRequest from "../../middlewares/validateRequest";
+
 import {
   changePasswordValidation,
   forgotPasswordValidation,
@@ -13,6 +11,9 @@ import {
   verifyOTPValidation,
 } from "./auth.validation";
 import auth from "../../middlewares/authMiddleware";
+import { authLimiter } from "../../middlewares/rateLimiter";
+import validateRequest from "../../middlewares/validateRequest";
+import { AuthController } from "./auth.controller";
 
 const router = Router();
 
