@@ -21,6 +21,8 @@ export default {
     stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
     client_url: process.env.CLIENT_URL,
   },
+  
+  client_url: process.env.CLIENT_URL,
 
   brevo: {
     api_key: process.env.BREVO_API_KEY!,

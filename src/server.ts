@@ -9,7 +9,7 @@ async function startServer() {
     app.listen(PORT, () => {
       logger.info(`🚀 Server is running on port ${PORT}`);
       logger.info(`🌍 Environment: ${config.env}`);
-      logger.info(`📊 Health check: http://localhost:${PORT}/health`);
+      logger.info(`📊 Health check: ${config.client_url}:${PORT}/health`);
     });
   } catch (error) {
     logger.error("Failed to start server:", error);

@@ -6,10 +6,9 @@
   "scripts": {
     "postinstall": "npx prisma generate",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc && npx prisma generate",
+    "build": "tsc",
     "start": "node dist/server.js",
-    "seed": "ts-node prisma/seedSuperAdmin.ts",
-    "vercel-build": "npm run build"
+    "seed": "ts-node prisma/seedSuperAdmin.ts"
   },
   "keywords": [],
   "author": "",
