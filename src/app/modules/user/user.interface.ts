@@ -1,5 +1,6 @@
 export interface IUpdateUserRequest {
-  name?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 export interface IUserFilterRequest {

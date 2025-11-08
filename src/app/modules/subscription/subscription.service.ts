@@ -41,7 +41,7 @@ const createSubscription = async (
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
         email: user.email,
-        name: user.name,
+        name: `${user.firstName} ${user.lastName}`,
         metadata: { userId: user.id },
       });
       stripeCustomerId = customer.id;
@@ -145,7 +145,8 @@ const getSubscriptionById = async (id: string, userId: string) => {
         select: {
           id: true,
           email: true,
-          name: true,
+          firstName: true,
+          lastName: true,
         },
       },
     },
@@ -155,7 +156,14 @@ const getSubscriptionById = async (id: string, userId: string) => {
     throw new AppError(status.NOT_FOUND, "Subscription not found");
   }
 
-  return subscription;
+  // Add virtual fullName for convenience
+  return {
+    ...subscription,
+    user: subscription.user && {
+      ...subscription.user,
+      fullName: `${subscription.user.firstName} ${subscription.user.lastName}`.trim(),
+    },
+  };
 };
 
 const cancelSubscription = async (
@@ -178,7 +186,6 @@ const cancelSubscription = async (
   }
 
   try {
-    // Cancel in Stripe
     const stripeSubscription = await stripe.subscriptions.update(
       subscription.stripeSubscriptionId,
       {
@@ -186,7 +193,6 @@ const cancelSubscription = async (
       }
     );
 
-    // Update in Database
     const updatedSubscription = await prisma.subscription.update({
       where: { id: subscription.id },
       data: {
@@ -194,9 +200,7 @@ const cancelSubscription = async (
         canceledAt: payload.cancelAtPeriodEnd ? null : new Date(),
         status: payload.cancelAtPeriodEnd ? subscription.status : "CANCELED",
       },
-      include: {
-        plan: true,
-      },
+      include: { plan: true },
     });
 
     return updatedSubscription;
@@ -225,21 +229,17 @@ const resumeSubscription = async (userId: string, subscriptionId: string) => {
   }
 
   try {
-    // Resume in Stripe
     await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
       cancel_at_period_end: false,
     });
 
-    // Update in Database
     const updatedSubscription = await prisma.subscription.update({
       where: { id: subscription.id },
       data: {
         cancelAtPeriodEnd: false,
         canceledAt: null,
       },
-      include: {
-        plan: true,
-      },
+      include: { plan: true },
     });
 
     return updatedSubscription;
@@ -319,16 +319,28 @@ const handleStripeWebhook = async (rawBody: Buffer, signature: string) => {
     case "invoice.payment_failed": {
       const invoice = event.data.object as Stripe.Invoice;
       if (invoice.subscription) {
-        await prisma.subscription.updateMany({
+        const dbSub = await prisma.subscription.findUnique({
           where: { stripeSubscriptionId: invoice.subscription as string },
-          data: {
-            status:
-              event.type === "invoice.payment_succeeded"
-                ? SubscriptionStatus.ACTIVE
-                : SubscriptionStatus.PAST_DUE,
-          },
         });
+        if (dbSub) {
+          await prisma.subscription.update({
+            where: { id: dbSub.id },
+            data: {
+              status:
+                event.type === "invoice.payment_succeeded"
+                  ? SubscriptionStatus.ACTIVE
+                  : SubscriptionStatus.PAST_DUE,
+            },
+          });
+        }
       }
+      break;
+    }
+
+    // Optional: Add trial reminder
+    case "customer.subscription.trial_will_end": {
+      const sub = event.data.object as Stripe.Subscription;
+      // You can send email reminder here
       break;
     }
   }

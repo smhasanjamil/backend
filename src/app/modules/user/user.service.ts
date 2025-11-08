@@ -9,7 +9,8 @@ const getProfile = async (userId: string) => {
     select: {
       id: true,
       email: true,
-      name: true,
+      firstName: true,
+      lastName: true,
       role: true,
       isVerified: true,
       createdAt: true,
@@ -17,10 +18,7 @@ const getProfile = async (userId: string) => {
     },
   });
 
-  if (!user) {
-    throw new AppError(404, "User not found");
-  }
-
+  if (!user) throw new AppError(404, "User not found");
   return user;
 };
 
@@ -39,7 +37,8 @@ const updateProfile = async (userId: string, payload: IUpdateUserRequest) => {
     select: {
       id: true,
       email: true,
-      name: true,
+      firstName: true,
+      lastName: true,
       role: true,
       isVerified: true,
       updatedAt: true,
@@ -55,9 +54,10 @@ const getAllUsers = async (options: any, filters: IUserFilterRequest) => {
   const where: any = {};
 
   if (filters.searchTerm) {
-    where.OR = [
+  where.OR = [
       { email: { contains: filters.searchTerm, mode: "insensitive" } },
-      { name: { contains: filters.searchTerm, mode: "insensitive" } },
+      { firstName: { contains: filters.searchTerm, mode: "insensitive" } },
+      { lastName: { contains: filters.searchTerm, mode: "insensitive" } },
     ];
   }
 
@@ -70,7 +70,8 @@ const getAllUsers = async (options: any, filters: IUserFilterRequest) => {
     select: {
       id: true,
       email: true,
-      name: true,
+      firstName: true,
+      lastName: true,
       role: true,
       isVerified: true,
       createdAt: true,

@@ -32,7 +32,8 @@ model User {
   id         String   @id @default(uuid())
   email      String   @unique
   password   String
-  name       String
+  firstName  String
+  lastName   String
   role       UserRole @default(USER)
   isVerified Boolean  @default(false)
   createdAt  DateTime @default(now())
@@ -49,7 +50,7 @@ model OTP {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   otp       String
-  type      String // SIGNUP, LOGIN, FORGOT_PASSWORD, CHANGE_PASSWORD
+  type      String
   expiresAt DateTime
   isUsed    Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -104,8 +105,9 @@ model Subscription {
 }
 
 model WebhookEvent {
-  id        String   @id
-  type      String
-  processed Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String    @id
+  type        String
+  processed   Boolean   @default(false)
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
 }

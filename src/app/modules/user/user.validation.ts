@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const updateUserValidation = {
   body: z.object({
-    name: z.string().min(2, "Name must be at least 2 characters").optional(),
+    firstName: z.string().min(2, "First name must be at least 2 characters").optional(),
+    lastName: z.string().min(2, "Last name must be at least 2 characters").optional(),
   }),
 };
 

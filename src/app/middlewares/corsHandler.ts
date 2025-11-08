@@ -1,7 +1,8 @@
 import cors from "cors";
+import config from "../config";
 
 const corsOptions = {
-  origin: ["http://localhost:3000", "http://localhost:5173"],
+  origin: [config.client_url],
   credentials: true,
   optionsSuccessStatus: 200,
 };

@@ -1,7 +1,8 @@
 export interface ISignupRequest {
   email: string;
   password: string;
-  name: string;
+  firstName: string;
+  lastName: string;
 }
 
 export interface IVerifyOTPRequest {

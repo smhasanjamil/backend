@@ -5,7 +5,7 @@ import config from "../src/app/config/index";
 const prisma = new PrismaClient();
 
 async function main() {
-  const { email, password, name } = config.super_admin;
+  const { email, password, firstName, lastName } = config.super_admin;
 
   // Only hash if we're creating or resetting
   const hashedPassword = await hashPassword(password);
@@ -15,23 +15,24 @@ async function main() {
   const shouldResetPassword =
     isDev && process.env.RESET_SUPER_ADMIN_PASSWORD === "true";
 
-  const superAdmin = await prisma.user.upsert({
-    where: { email },
-    update: {
-      name,
-      role: UserRole.SUPER_ADMIN,
-      isVerified: true,
-      // Only update password if explicitly allowed
-      ...(shouldResetPassword && { password: hashedPassword }),
-    },
-    create: {
-      email,
-      password: hashedPassword,
-      name,
-      role: UserRole.SUPER_ADMIN,
-      isVerified: true,
-    },
-  });
+ const superAdmin = await prisma.user.upsert({
+  where: { email },
+  update: {
+    firstName,
+    lastName,
+    role: UserRole.SUPER_ADMIN,
+    isVerified: true,
+    ...(shouldResetPassword && { password: hashedPassword }),
+  },
+  create: {
+    email,
+    password: hashedPassword,
+    firstName,
+    lastName,
+    role: UserRole.SUPER_ADMIN,
+    isVerified: true,
+  },
+});
 
   console.log(`Super Admin ${superAdmin.email} is ready.`);
   if (shouldResetPassword) {

@@ -11,9 +11,7 @@ export const generateAccessToken = (payload: ITokenPayload): string => {
   return jwt.sign(
     payload,
     config.jwt.access_secret as Secret,
-    {
-      expiresIn: config.jwt.access_expires_in,
-    } as SignOptions
+    { expiresIn: config.jwt.access_expires_in } as SignOptions
   );
 };
 
@@ -21,9 +19,7 @@ export const generateRefreshToken = (payload: ITokenPayload): string => {
   return jwt.sign(
     payload,
     config.jwt.refresh_secret as Secret,
-    {
-      expiresIn: config.jwt.refresh_expires_in,
-    } as SignOptions
+    { expiresIn: config.jwt.refresh_expires_in } as SignOptions
   );
 };
 
