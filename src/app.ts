@@ -1,3 +1,4 @@
+// src/app.ts
 import express, { Application } from "express";
 import { SubscriptionController } from "./app/modules/subscription/subscription.controller";
 import corsHandler from "./app/middlewares/corsHandler";
@@ -8,57 +9,61 @@ import config from "./app/config";
 import router from "./app/routes";
 import notFoundHandler from "./app/middlewares/notFoundHandler";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
+import { healthRoutes } from "./app/modules/health/health.route";
+// import { SubscriptionController } from "./app/modules/subscription/subscription.controller";
+// import corsHandler from "./app/middlewares/corsHandler";
+// import securityHeaders from "./app/middlewares/securityHeaders";
+// import { generalLimiter } from "./app/middlewares/rateLimiter";
+// import requestLogger from "./app/middlewares/requestLogger";
+// import config from "./app/config";
+// import router from "./app/routes";
+// import notFoundHandler from "./app/middlewares/notFoundHandler";
+// import globalErrorHandler from "./app/middlewares/globalErrorHandler";
+// import healthRoutes from "./app/modules/health/health.route";
 
 const app: Application = express();
 
-// === RAW BODY FOR STRIPE WEBHOOK (MUST BE BEFORE express.json()) ===
+// === STRIPE WEBHOOK RAW BODY ===
 const webhookRawBody = express.raw({ type: "application/json" });
 
-// Apply raw body parser ONLY to the webhook route
 app.post(
   "/api/v1/subscriptions/webhook",
   webhookRawBody,
   (req, res, next) => {
-    // Save raw body for Stripe verification
     (req as any).rawBody = req.body;
     next();
   },
   SubscriptionController.handleWebhook
 );
 
-// === NOW apply JSON parser for ALL other routes ===
+// === BODY PARSERS ===
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// === Global Middlewares ===
+// === GLOBAL MIDDLEWARES ===
 app.use(corsHandler);
 app.use(securityHeaders);
 app.use(generalLimiter);
 app.use(requestLogger);
 
-// === ROOT & HEALTH ===
+// === ROOT ===
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
     message: "Welcome to Your API",
     version: "1.0.0",
-    health: `http://localhost:${config.port}/health`,
+    health: `${config.backend_url}/health`,
+    docs: `${config.backend_url}/api-docs`,
   });
 });
 
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Server is healthy",
-    timestamp: new Date().toISOString(),
-    env: config.env,
-  });
-});
+// === HEALTH CHECK ===
+app.use("/health", healthRoutes);
 
 // === API ROUTES ===
 app.use("/api/v1", router);
 
-// === 404 & Error Handler ===
+// === ERROR HANDLERS ===
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
 
