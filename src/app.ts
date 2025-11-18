@@ -10,16 +10,6 @@ import router from "./app/routes";
 import notFoundHandler from "./app/middlewares/notFoundHandler";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 import { healthRoutes } from "./app/modules/health/health.route";
-// import { SubscriptionController } from "./app/modules/subscription/subscription.controller";
-// import corsHandler from "./app/middlewares/corsHandler";
-// import securityHeaders from "./app/middlewares/securityHeaders";
-// import { generalLimiter } from "./app/middlewares/rateLimiter";
-// import requestLogger from "./app/middlewares/requestLogger";
-// import config from "./app/config";
-// import router from "./app/routes";
-// import notFoundHandler from "./app/middlewares/notFoundHandler";
-// import globalErrorHandler from "./app/middlewares/globalErrorHandler";
-// import healthRoutes from "./app/modules/health/health.route";
 
 const app: Application = express();
 

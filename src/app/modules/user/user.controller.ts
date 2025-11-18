@@ -3,6 +3,7 @@ import catchAsync from "../../utils/catchAsync";
 import { UserService } from "./user.service";
 import sendResponse from "../../utils/sendResponse";
 
+
 const getProfile = catchAsync(async (req: Request, res: Response) => {
   const result = await UserService.getProfile(req.user!.userId);
   sendResponse(res, {
@@ -14,12 +15,47 @@ const getProfile = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updateProfile = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserService.updateProfile(req.user!.userId, req.body);
+  const result = await UserService.updateProfile(
+    req.user!.userId,
+    req.body,
+    req.file // Multer file
+  );
   sendResponse(res, {
     statusCode: 200,
     success: true,
     message: "Profile updated successfully",
     data: result,
+  });
+});
+
+const uploadProfileImage = catchAsync(async (req: Request, res: Response) => {
+  if (!req.file) {
+    return sendResponse(res, {
+      statusCode: 400,
+      success: false,
+      message: "No image file provided",
+    });
+  }
+
+  const result = await UserService.uploadProfileImage(
+    req.user!.userId,
+    req.file
+  );
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Profile image uploaded successfully",
+    data: result,
+  });
+});
+
+const deleteProfileImage = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.deleteProfileImage(req.user!.userId);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
   });
 });
 
@@ -56,6 +92,8 @@ const deleteUser = catchAsync(async (req: Request, res: Response) => {
 export const UserController = {
   getProfile,
   updateProfile,
+  uploadProfileImage,
+  deleteProfileImage,
   getAllUsers,
   deleteUser,
 };

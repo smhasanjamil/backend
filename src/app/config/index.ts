@@ -6,7 +6,7 @@ dotenv.config({ path: path.join(process.cwd(), ".env") });
 export default {
   env: process.env.NODE_ENV || "development",
   port: process.env.PORT || 5000,
-  database_url: process.env.DATABASE_URL,
+  database_url: process.env.DATABASE_URL!,
 
   client_url: process.env.CLIENT_URL!,
   backend_url: process.env.BACKEND_URL!,
@@ -19,23 +19,31 @@ export default {
   },
 
   stripe: {
-    stripe_secret_key: process.env.STRIPE_SECRET_KEY,
-    stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
+    stripe_secret_key: process.env.STRIPE_SECRET_KEY!,
+    stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET!,
     client_url: process.env.CLIENT_URL!,
   },
 
   brevo: {
     api_key: process.env.BREVO_API_KEY!,
     sender_email: process.env.BREVO_SENDER_EMAIL!,
-    sender_name: process.env.BREVO_SENDER_NAME || "App",
+    sender_name: process.env.BREVO_SENDER_NAME!,
   },
 
-  otp_expiry_minutes: parseInt(process.env.OTP_EXPIRY_MINUTES || "10", 10),
+  otp_expiry_minutes: Number(process.env.OTP_EXPIRY_MINUTES) || 10,
 
+  // Super Admin — now properly split
   super_admin: {
     email: process.env.SUPER_ADMIN_EMAIL!,
     password: process.env.SUPER_ADMIN_PASSWORD!,
     firstName: process.env.SUPER_ADMIN_FIRST_NAME || "Super",
     lastName: process.env.SUPER_ADMIN_LAST_NAME || "Admin",
+  },
+
+  aws: {
+    region: process.env.AWS_REGION!,
+    access_key_id: process.env.AWS_ACCESS_KEY_ID!,
+    secret_access_key: process.env.AWS_SECRET_ACCESS_KEY!,
+    s3_bucket_name: process.env.AWS_S3_BUCKET_NAME!,
   },
 };

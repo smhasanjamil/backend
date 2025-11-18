@@ -5,14 +5,6 @@ import AppError from "../errors/AppError";
 import { verifyAccessToken } from "../utils/generateToken";
 import prisma from "../config/prisma";
 
-// Optional: Define payload shape
-interface JwtPayload {
-  userId: string;
-  email: string;
-  role: UserRole;
-}
-
-// Unified auth middleware
 const auth = (...requiredRoles: UserRole[]) => {
   return catchAsync(
     async (req: Request, _res: Response, next: NextFunction) => {
@@ -26,26 +18,41 @@ const auth = (...requiredRoles: UserRole[]) => {
       if (!token) throw new AppError(401, "Access token is required");
 
       // 2. Verify token
-      let decoded: JwtPayload;
+      let decoded;
       try {
-        decoded = verifyAccessToken(token) as JwtPayload;
+        decoded = verifyAccessToken(token);
       } catch (error) {
         throw new AppError(401, "Invalid or expired access token");
       }
 
-      // 3. Find user in DB (optional: for freshness)
+      // 3. Find user in DB with status checks
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { id: true, email: true, role: true },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          isActive: true,
+          isDeleted: true,
+        },
       });
 
       if (!user) {
         throw new AppError(401, "User no longer exists");
       }
 
-      // 4. Role check
+      if (user.isDeleted) {
+        throw new AppError(401, "User account has been deleted");
+      }
+
+      if (!user.isActive) {
+        throw new AppError(403, "User account is inactive");
+      }
+
+      // 4. Role check with better error message
       if (requiredRoles.length > 0 && !requiredRoles.includes(user.role)) {
-        throw new AppError(403, "Forbidden: Insufficient permissions");
+        const requiredRolesStr = requiredRoles.join(" or ");
+        throw new AppError(403, `Access denied. Insufficient permissions`);
       }
 
       // 5. Attach user to request
