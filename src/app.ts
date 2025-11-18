@@ -43,7 +43,7 @@ app.get("/", (req, res) => {
     message: "Welcome to Your API",
     version: "1.0.0",
     health: `${config.backend_url}/health`,
-    docs: `${config.backend_url}/api-docs`,
+    server: `${config.backend_url}`,
   });
 });
 

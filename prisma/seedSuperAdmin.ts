@@ -1,9 +1,9 @@
-import { PrismaClient, UserRole } from "@prisma/client";
+import prisma from "../src/app/config/prisma";
 import hashPassword from "../src/app/utils/hashPassword";
 import config from "../src/app/config/index";
+import { UserRole } from "@prisma/client";
 
-const prisma = new PrismaClient();
-const SUPER_ADMIN_FIXED_ID = "super-admin-0001"; // Never changes
+const SUPER_ADMIN_FIXED_ID = "super-admin-0001";
 
 async function main() {
   const { email, password, firstName, lastName } = config.super_admin;
@@ -40,13 +40,13 @@ async function main() {
   });
 
   console.log(
-    `Super Admin ready: ${superAdmin.email} (${superAdmin.firstName} ${superAdmin.lastName})`
+    `✅ Super Admin ready: ${superAdmin.email} (${superAdmin.firstName} ${superAdmin.lastName})`
   );
 }
 
 main()
   .catch((e) => {
-    console.error("Super Admin seeding failed:", e.message);
+    console.error("❌ Super Admin seeding failed:", e.message);
     process.exit(1);
   })
   .finally(async () => {
